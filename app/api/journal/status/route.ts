@@ -19,7 +19,7 @@ export async function POST(request: Request) {
     const bot = new TelegramBot(token);
     
     const statusEmoji = status === "profit" ? "✅" : status === "loss" ? "❌" : "⏭️";
-    const msg = `✅ Day Recorded!\n\n${statusEmoji} Status: ${status.toUpperCase()}\n📊 Symbol: ${symbol}\n📈 PnL: ${pnlPercent}%\n🔢 Trades: ${tradesCount}\n\nGreat job maintaining discipline! 💪`;
+    const msg = `✅ Anush recorded a trade!\n\n${statusEmoji} Status: ${status.toUpperCase()}\n📊 Symbol: ${symbol}\n📈 PnL: ${pnlPercent}%\n🔢 Trades: ${tradesCount}\n\nKeep going! 💪`;
     
     await bot.sendMessage(chatId, msg);
     

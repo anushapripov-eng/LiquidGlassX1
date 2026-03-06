@@ -45,6 +45,7 @@ export function AuthScreen() {
       })
       const data = await res.json()
       if (data.success) {
+        store.setSession(data.user)
         window.location.href = "/"
       } else {
         setError(data.error || "Login failed")

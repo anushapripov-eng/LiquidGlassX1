@@ -195,17 +195,19 @@ export function useStore() {
     state = { ...state, balance: state.balance + change }
     emit()
 
-    // Notify Telegram
-    fetch("/api/journal/status", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        tradesCount: 1,
-        pnlPercent: trade.result,
-        symbol: trade.asset,
-        status: trade.result > 0 ? "profit" : trade.result < 0 ? "loss" : "skip"
-      })
-    }).catch(() => {});
+    // Notify Telegram (Only if Anush)
+    if (state.auth.currentUser === "Anush") {
+      fetch("/api/journal/status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tradesCount: 1,
+          pnlPercent: trade.result,
+          symbol: trade.asset,
+          status: trade.result > 0 ? "profit" : trade.result < 0 ? "loss" : "skip"
+        })
+      }).catch(() => {});
+    }
   }, [])
 
   const updateTrade = useCallback((id: string, updates: Partial<Trade>) => {
@@ -387,6 +389,19 @@ export function useStore() {
     emit()
   }, [])
 
+  const setSession = useCallback((user: { name: string; nickname: string; avatarIndex: number }) => {
+    state = {
+      ...state,
+      auth: { ...state.auth, isLoggedIn: true, currentUser: user.name },
+      profile: {
+        ...state.profile,
+        nickname: user.nickname,
+        avatarIndex: user.avatarIndex,
+      },
+    }
+    emit()
+  }, [])
+
   return {
     ...snap,
     updateProfile,
@@ -408,6 +423,7 @@ export function useStore() {
     setAccentColor,
     setFinnhubApiKey,
     setMetalPriceApiKey,
+    setSession,
     registerUser,
     loginUser,
     logoutUser,

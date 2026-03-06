@@ -36,11 +36,6 @@ export function AppShell() {
   const [balanceOpen, setBalanceOpen] = useState(false)
   const store = useStore()
 
-  // Auth gate
-  if (!store.auth.isLoggedIn) {
-    return <AuthScreen />
-  }
-
   const renderSection = () => {
     switch (activeSection) {
       case "dashboard":
