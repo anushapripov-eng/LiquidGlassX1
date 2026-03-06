@@ -11,8 +11,10 @@ export async function GET() {
 
   try {
     const bot = new TelegramBot(token);
-    await bot.sendMessage(chatId, "✅ Telegram works. Assistant online.");
-    return NextResponse.json({ success: true, message: "Telegram works. Assistant online." });
+    const msg = "✅ Telegram connection verified! Assistant is online and ready. 🚀";
+    await bot.sendMessage(chatId, msg);
+    console.log("Test message successfully sent to Telegram:", chatId);
+    return NextResponse.json({ success: true, message: msg });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

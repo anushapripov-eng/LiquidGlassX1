@@ -16,7 +16,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  if (pathname === "/login" || pathname.startsWith("/api/auth")) {
+  if (pathname === "/login" || pathname.startsWith("/api/auth") || pathname === "/api/test-telegram") {
     return NextResponse.next();
   }
 

@@ -1,3 +1,4 @@
 {
-  "/page": "app/page.js"
+  "/api/test-telegram/route": "app/api/test-telegram/route.js",
+  "/login/page": "app/login/page.js"
 }

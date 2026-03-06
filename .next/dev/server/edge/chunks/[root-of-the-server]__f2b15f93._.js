@@ -50,7 +50,7 @@ async function middleware(request) {
     if (pathname.startsWith("/_next") || pathname.startsWith("/static") || pathname.includes(".")) {
         return __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$esm$2f$server$2f$web$2f$exports$2f$index$2e$js__$5b$middleware$2d$edge$5d$__$28$ecmascript$29$__["NextResponse"].next();
     }
-    if (pathname === "/login" || pathname.startsWith("/api/auth")) {
+    if (pathname === "/login" || pathname.startsWith("/api/auth") || pathname === "/api/test-telegram") {
         return __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$esm$2f$server$2f$web$2f$exports$2f$index$2e$js__$5b$middleware$2d$edge$5d$__$28$ecmascript$29$__["NextResponse"].next();
     }
     const token = (await (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$esm$2f$server$2f$request$2f$cookies$2e$js__$5b$middleware$2d$edge$5d$__$28$ecmascript$29$__["cookies"])()).get("auth-token")?.value;

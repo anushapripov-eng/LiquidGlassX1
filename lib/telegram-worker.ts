@@ -1,20 +1,31 @@
 import TelegramBot from "node-telegram-bot-api";
 import schedule from "node-schedule";
+import fs from "fs";
+import * as dotenv from "dotenv";
+
+dotenv.config({ path: ".env.local" });
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 const chatId = process.env.TELEGRAM_CHAT_ID;
 
-// Simple in-memory DB for flags (lost on restart, but per requirement we should store in DB)
-// For now, since no DB is set up, we'll use a local file
-import fs from "fs";
 const DB_FILE = ".telegram_db.json";
 let db: any = {};
-if (fs.existsSync(DB_FILE)) db = JSON.parse(fs.readFileSync(DB_FILE, "utf-8"));
+if (fs.existsSync(DB_FILE)) {
+  try {
+    db = JSON.parse(fs.readFileSync(DB_FILE, "utf-8"));
+  } catch (e) {
+    db = {};
+  }
+}
 const saveDb = () => fs.writeFileSync(DB_FILE, JSON.stringify(db));
 
 if (token && chatId) {
   const bot = new TelegramBot(token);
+  console.log("Telegram bot worker started!");
   
+  // Test message on startup to verify connection
+  bot.sendMessage(chatId, "🚀 TradeJournal Assistant is now online and monitoring your trades!").catch(console.error);
+
   // Morning reminders Mon-Fri 10:45
   schedule.scheduleJob({ hour: 10, minute: 45, dayOfWeek: [1,2,3,4,5], tz: "Asia/Yerevan" }, () => {
     const today = new Date().toISOString().split("T")[0];
@@ -37,8 +48,6 @@ if (token && chatId) {
     const today = new Date().toISOString().split("T")[0];
     if (db[`sent_evening_${today}`]) return;
 
-    // Logic for checking journal would go here if we had server-side access to store
-    // For now, sending a general reminder
     const msgs = [
       "Hey! Don't forget to fill your journal for today! 📝",
       "Time to review your trades! 🧐 Did you log everything?",
@@ -53,11 +62,13 @@ if (token && chatId) {
 
   // Weekly Saturday 02:00
   schedule.scheduleJob({ hour: 2, minute: 0, dayOfWeek: 6, tz: "Asia/Yerevan" }, () => {
-    const weekId = new Date().toISOString().split("T")[0]; // simplified
+    const weekId = new Date().toISOString().split("T")[0];
     if (db[`sent_weekly_${weekId}`]) return;
 
     bot.sendMessage(chatId, "📊 Weekly summary time! Great work this week! 🗓️");
     db[`sent_weekly_${weekId}`] = true;
     saveDb();
   });
+} else {
+  console.error("Telegram token or chatId missing in environment");
 }
