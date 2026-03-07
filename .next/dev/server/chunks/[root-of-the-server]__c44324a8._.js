@@ -78,7 +78,7 @@ async function middleware(request) {
     if (pathname.startsWith("/_next") || pathname.startsWith("/static") || pathname.includes(".")) {
         return __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].next();
     }
-    if (pathname === "/login" || pathname.startsWith("/api/auth")) {
+    if (pathname === "/login" || pathname.startsWith("/api/auth") || pathname === "/api/test-telegram") {
         return __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].next();
     }
     const token = (await (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$headers$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["cookies"])()).get("auth-token")?.value;
