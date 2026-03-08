@@ -1973,16 +1973,6 @@
     background-color: var(--color-amber-500);
   }
 
-  .bg-amber-500\/10 {
-    background-color: #f99c001a;
-  }
-
-  @supports (color: color-mix(in lab, red, red)) {
-    .bg-amber-500\/10 {
-      background-color: color-mix(in oklab, var(--color-amber-500) 10%, transparent);
-    }
-  }
-
   .bg-background {
     background-color: var(--background);
   }
@@ -2758,10 +2748,6 @@
 
   .text-accent-foreground {
     color: var(--accent-foreground);
-  }
-
-  .text-amber-500 {
-    color: var(--color-amber-500);
   }
 
   .text-background {

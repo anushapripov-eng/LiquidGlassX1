@@ -11,16 +11,27 @@ __turbopack_context__.s([
     ()=>generateId,
     "getWeekStart",
     ()=>getWeekStart,
+    "loadUserDataFromSupabase",
+    ()=>loadUserDataFromSupabase,
+    "supabase",
+    ()=>supabase,
     "useStore",
     ()=>useStore
 ]);
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$supabase$2f$supabase$2d$js$2f$dist$2f$index$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__ = __turbopack_context__.i("[project]/node_modules/@supabase/supabase-js/dist/index.mjs [app-ssr] (ecmascript) <locals>");
 "use client";
 ;
+;
+// ── Supabase Client ────────────────────────────────────────────────
+const supabaseUrl = ("TURBOPACK compile-time value", "https://cbnuokgmzvlmrtjiwigh.supabase.co");
+const supabaseAnonKey = ("TURBOPACK compile-time value", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNibnVva2dtenZsbXJ0aml3aWdoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI1OTgyNjgsImV4cCI6MjA4ODE3NDI2OH0.cqyVdT7fA1isnX2QIk27ZGZSIm96L3rMMuYl9amz4CE");
+const supabase = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$supabase$2f$supabase$2d$js$2f$dist$2f$index$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["createClient"])(supabaseUrl, supabaseAnonKey);
 const defaultState = {
     auth: {
         isLoggedIn: false,
         currentUser: null,
+        currentUserId: null,
         users: []
     },
     profile: {
@@ -71,29 +82,17 @@ const defaultState = {
     skipDays: [],
     accentColor: "blue",
     finnhubApiKey: "",
-    metalPriceApiKey: "d849bb0071fd2f5442fdd4b1f0381498"
+    metalPriceApiKey: "d849bb0071fd2f5442fdd4b1f0381498",
+    isSyncing: false
 };
 // ── Store ──────────────────────────────────────────────────────────
 let state = defaultState;
 let listeners = new Set();
 let isInitialized = false;
-function loadFromStorage() {
-    if ("TURBOPACK compile-time truthy", 1) return defaultState;
-    //TURBOPACK unreachable
-    ;
-}
-function saveToStorage() {
-    if ("TURBOPACK compile-time truthy", 1) return;
-    //TURBOPACK unreachable
-    ;
-}
 function emit() {
-    saveToStorage();
     listeners.forEach((l)=>l());
 }
 function getSnapshot() {
-    if ("TURBOPACK compile-time falsy", 0) //TURBOPACK unreachable
-    ;
     return state;
 }
 function getServerSnapshot() {
@@ -101,13 +100,147 @@ function getServerSnapshot() {
 }
 function subscribe(listener) {
     listeners.add(listener);
-    if ("TURBOPACK compile-time falsy", 0) //TURBOPACK unreachable
-    ;
     return ()=>listeners.delete(listener);
+}
+async function loadUserDataFromSupabase(userId) {
+    state = {
+        ...state,
+        isSyncing: true
+    };
+    emit();
+    try {
+        // Load profile
+        const { data: profile } = await supabase.from("profile_settings").select("*").eq("user_id", userId).single();
+        // Load trades
+        const { data: trades } = await supabase.from("trades").select("*").eq("user_id", userId).order("trade_date", {
+            ascending: false
+        });
+        // Load weekly notes
+        const { data: weeklyNotes } = await supabase.from("weekly_notes").select("*").eq("user_id", userId);
+        // Load mistakes
+        const { data: mistakes } = await supabase.from("mistakes").select("*").eq("user_id", userId);
+        // Load important points
+        const { data: importantPoints } = await supabase.from("important_points").select("*").eq("user_id", userId).order("sort_order", {
+            ascending: true
+        });
+        // Load rules
+        const { data: rules } = await supabase.from("rules").select("*").eq("user_id", userId).order("sort_order", {
+            ascending: true
+        });
+        // Load skip days
+        const { data: dailyNotes } = await supabase.from("daily_notes").select("*").eq("user_id", userId).eq("is_skipped", true);
+        state = {
+            ...state,
+            isSyncing: false,
+            profile: profile ? {
+                nickname: profile.nickname ?? state.profile.nickname,
+                avatarIndex: profile.avatar_index ?? 0,
+                customAvatarUrl: profile.custom_avatar_url,
+                accountSize: Number(profile.account_size) || 10000,
+                bio: profile.bio ?? ""
+            } : state.profile,
+            balance: profile ? Number(profile.account_size) || state.balance : state.balance,
+            initialBalance: profile ? Number(profile.account_size) || state.initialBalance : state.initialBalance,
+            accentColor: profile?.accent_color ?? state.accentColor,
+            finnhubApiKey: profile?.finnhub_api_key ?? "",
+            metalPriceApiKey: profile?.metal_price_api_key ?? state.metalPriceApiKey,
+            trades: (trades ?? []).map((t)=>({
+                    id: t.id,
+                    date: t.trade_date,
+                    asset: t.asset,
+                    result: Number(t.result),
+                    notes: t.notes ?? "",
+                    photoUrl: t.photo_url
+                })),
+            weeklyNotes: (weeklyNotes ?? []).map((w)=>({
+                    id: w.id,
+                    weekStart: w.week_start_date,
+                    notes: w.thoughts ?? "",
+                    learning: w.learning,
+                    improve: w.improve,
+                    thoughts: w.thoughts,
+                    balanceChange: Number(w.balance_change) || 0,
+                    goalHit: w.goal_hit ?? false
+                })),
+            mistakes: (mistakes ?? []).map((m)=>({
+                    id: m.id,
+                    date: m.mistake_date,
+                    description: m.description,
+                    tag: m.tag
+                })),
+            importantPoints: (importantPoints ?? []).map((p)=>({
+                    id: p.id,
+                    note: p.note,
+                    pinned: p.is_pinned ?? false,
+                    imageUrl: p.image_url,
+                    createdAt: p.created_at
+                })),
+            rules: rules && rules.length > 0 ? rules.map((r)=>({
+                    id: r.id,
+                    text: r.text,
+                    imageUrl: r.image_url,
+                    createdAt: r.created_at
+                })) : state.rules,
+            skipDays: (dailyNotes ?? []).map((d)=>d.note_date)
+        };
+        // Recalculate balance from trades
+        if (trades && trades.length > 0 && profile) {
+            const baseBalance = Number(profile.account_size) || 10000;
+            let currentBalance = baseBalance;
+            const sortedTrades = [
+                ...trades
+            ].sort((a, b)=>new Date(a.trade_date).getTime() - new Date(b.trade_date).getTime());
+            for (const t of sortedTrades){
+                currentBalance = currentBalance + currentBalance * (Number(t.result) / 100);
+            }
+            state = {
+                ...state,
+                balance: currentBalance,
+                initialBalance: baseBalance
+            };
+        }
+        emit();
+    } catch (error) {
+        console.error("Failed to load data from Supabase:", error);
+        state = {
+            ...state,
+            isSyncing: false
+        };
+        emit();
+    }
 }
 function useStore() {
     const snap = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useSyncExternalStore"])(subscribe, getSnapshot, getServerSnapshot);
-    const updateProfile = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])((profile)=>{
+    // Initialize: check session on mount
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"])(()=>{
+        if (isInitialized) return;
+        isInitialized = true;
+        const checkSession = async ()=>{
+            const res = await fetch("/api/auth/session").catch(()=>null);
+            if (!res?.ok) return;
+            const data = await res.json().catch(()=>null);
+            if (data?.user) {
+                state = {
+                    ...state,
+                    auth: {
+                        ...state.auth,
+                        isLoggedIn: true,
+                        currentUser: data.user.name,
+                        currentUserId: data.user.id
+                    },
+                    profile: {
+                        ...state.profile,
+                        nickname: data.user.nickname,
+                        avatarIndex: data.user.avatarIndex
+                    }
+                };
+                emit();
+                await loadUserDataFromSupabase(data.user.id);
+            }
+        };
+        checkSession();
+    }, []);
+    const updateProfile = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])(async (profile)=>{
         state = {
             ...state,
             profile: {
@@ -116,25 +249,45 @@ function useStore() {
             }
         };
         emit();
+        const userId = state.auth.currentUserId;
+        if (!userId) return;
+        await supabase.from("profile_settings").upsert({
+            user_id: userId,
+            nickname: state.profile.nickname,
+            avatar_index: state.profile.avatarIndex,
+            custom_avatar_url: profile.customAvatarUrl,
+            account_size: state.profile.accountSize,
+            bio: state.profile.bio,
+            accent_color: state.accentColor,
+            updated_at: new Date().toISOString()
+        });
     }, []);
-    const setBalance = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])((balance)=>{
+    const setBalance = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])(async (balance)=>{
         state = {
             ...state,
             balance
         };
         emit();
     }, []);
-    const setInitialBalance = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])((initialBalance)=>{
+    const setInitialBalance = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])(async (initialBalance)=>{
         state = {
             ...state,
             initialBalance
         };
         emit();
+        const userId = state.auth.currentUserId;
+        if (!userId) return;
+        await supabase.from("profile_settings").upsert({
+            user_id: userId,
+            account_size: initialBalance,
+            updated_at: new Date().toISOString()
+        });
     }, []);
-    const addTrade = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])((trade)=>{
+    const addTrade = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])(async (trade)=>{
+        const tempId = crypto.randomUUID();
         const newTrade = {
             ...trade,
-            id: crypto.randomUUID()
+            id: tempId
         };
         state = {
             ...state,
@@ -143,14 +296,33 @@ function useStore() {
                 newTrade
             ]
         };
-        // Auto-update balance
         const change = state.balance * (trade.result / 100);
         state = {
             ...state,
             balance: state.balance + change
         };
         emit();
-        // Notify Telegram (Only if Anush)
+        const userId = state.auth.currentUserId;
+        if (userId) {
+            const { data } = await supabase.from("trades").insert({
+                user_id: userId,
+                asset: trade.asset,
+                result: trade.result,
+                trade_date: trade.date,
+                notes: trade.notes,
+                photo_url: trade.photoUrl
+            }).select().single();
+            if (data) {
+                state = {
+                    ...state,
+                    trades: state.trades.map((t)=>t.id === tempId ? {
+                            ...t,
+                            id: data.id
+                        } : t)
+                };
+                emit();
+            }
+        }
         if (state.auth.currentUser === "Anush") {
             fetch("/api/journal/status", {
                 method: "POST",
@@ -166,7 +338,7 @@ function useStore() {
             }).catch(()=>{});
         }
     }, []);
-    const updateTrade = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])((id, updates)=>{
+    const updateTrade = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])(async (id, updates)=>{
         state = {
             ...state,
             trades: state.trades.map((t)=>t.id === id ? {
@@ -175,15 +347,29 @@ function useStore() {
                 } : t)
         };
         emit();
+        const userId = state.auth.currentUserId;
+        if (!userId) return;
+        await supabase.from("trades").update({
+            asset: updates.asset,
+            result: updates.result,
+            trade_date: updates.date,
+            notes: updates.notes,
+            photo_url: updates.photoUrl,
+            updated_at: new Date().toISOString()
+        }).eq("id", id).eq("user_id", userId);
     }, []);
-    const deleteTrade = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])((id)=>{
+    const deleteTrade = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])(async (id)=>{
         state = {
             ...state,
             trades: state.trades.filter((t)=>t.id !== id)
         };
         emit();
+        const userId = state.auth.currentUserId;
+        if (userId) {
+            await supabase.from("trades").delete().eq("id", id).eq("user_id", userId);
+        }
     }, []);
-    const addWeeklyNote = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])((note)=>{
+    const addWeeklyNote = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])(async (note)=>{
         const existing = state.weeklyNotes.find((n)=>n.weekStart === note.weekStart);
         if (existing) {
             state = {
@@ -206,49 +392,113 @@ function useStore() {
             };
         }
         emit();
+        const userId = state.auth.currentUserId;
+        if (!userId) return;
+        await supabase.from("weekly_notes").upsert({
+            user_id: userId,
+            week_start_date: note.weekStart,
+            learning: note.learning,
+            improve: note.improve,
+            thoughts: note.thoughts,
+            balance_change: note.balanceChange,
+            goal_hit: note.goalHit,
+            updated_at: new Date().toISOString()
+        }, {
+            onConflict: "user_id,week_start_date"
+        });
     }, []);
-    const addMistake = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])((mistake)=>{
+    const addMistake = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])(async (mistake)=>{
+        const tempId = crypto.randomUUID();
         state = {
             ...state,
             mistakes: [
                 ...state.mistakes,
                 {
                     ...mistake,
-                    id: crypto.randomUUID()
+                    id: tempId
                 }
             ]
         };
         emit();
+        const userId = state.auth.currentUserId;
+        if (userId) {
+            const { data } = await supabase.from("mistakes").insert({
+                user_id: userId,
+                mistake_date: mistake.date,
+                description: mistake.description,
+                tag: mistake.tag
+            }).select().single();
+            if (data) {
+                state = {
+                    ...state,
+                    mistakes: state.mistakes.map((m)=>m.id === tempId ? {
+                            ...m,
+                            id: data.id
+                        } : m)
+                };
+                emit();
+            }
+        }
     }, []);
-    const deleteMistake = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])((id)=>{
+    const deleteMistake = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])(async (id)=>{
         state = {
             ...state,
             mistakes: state.mistakes.filter((m)=>m.id !== id)
         };
         emit();
+        const userId = state.auth.currentUserId;
+        if (userId) {
+            await supabase.from("mistakes").delete().eq("id", id).eq("user_id", userId);
+        }
     }, []);
-    const addImportantPoint = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])((point)=>{
+    const addImportantPoint = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])(async (point)=>{
+        const tempId = crypto.randomUUID();
+        const createdAt = new Date().toISOString();
         state = {
             ...state,
             importantPoints: [
                 ...state.importantPoints,
                 {
                     ...point,
-                    id: crypto.randomUUID(),
-                    createdAt: new Date().toISOString()
+                    id: tempId,
+                    createdAt
                 }
             ]
         };
         emit();
+        const userId = state.auth.currentUserId;
+        if (userId) {
+            const { data } = await supabase.from("important_points").insert({
+                user_id: userId,
+                note: point.note,
+                is_pinned: point.pinned,
+                image_url: point.imageUrl,
+                sort_order: state.importantPoints.length - 1
+            }).select().single();
+            if (data) {
+                state = {
+                    ...state,
+                    importantPoints: state.importantPoints.map((p)=>p.id === tempId ? {
+                            ...p,
+                            id: data.id
+                        } : p)
+                };
+                emit();
+            }
+        }
     }, []);
-    const deleteImportantPoint = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])((id)=>{
+    const deleteImportantPoint = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])(async (id)=>{
         state = {
             ...state,
             importantPoints: state.importantPoints.filter((p)=>p.id !== id)
         };
         emit();
+        const userId = state.auth.currentUserId;
+        if (userId) {
+            await supabase.from("important_points").delete().eq("id", id).eq("user_id", userId);
+        }
     }, []);
-    const moveImportantPoint = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])((id, direction)=>{
+    const moveImportantPoint = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])(async (id, direction)=>{
         const idx = state.importantPoints.findIndex((p)=>p.id === id);
         if (idx < 0) return;
         const newIdx = direction === "up" ? idx - 1 : idx + 1;
@@ -265,29 +515,65 @@ function useStore() {
             importantPoints: items
         };
         emit();
+        const userId = state.auth.currentUserId;
+        if (userId) {
+            await Promise.all([
+                supabase.from("important_points").update({
+                    sort_order: newIdx
+                }).eq("id", items[newIdx].id),
+                supabase.from("important_points").update({
+                    sort_order: idx
+                }).eq("id", items[idx].id)
+            ]);
+        }
     }, []);
-    const addRule = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])((rule)=>{
+    const addRule = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])(async (rule)=>{
+        const tempId = crypto.randomUUID();
+        const createdAt = new Date().toISOString();
         state = {
             ...state,
             rules: [
                 ...state.rules,
                 {
                     ...rule,
-                    id: crypto.randomUUID(),
-                    createdAt: new Date().toISOString()
+                    id: tempId,
+                    createdAt
                 }
             ]
         };
         emit();
+        const userId = state.auth.currentUserId;
+        if (userId) {
+            const { data } = await supabase.from("rules").insert({
+                user_id: userId,
+                text: rule.text,
+                image_url: rule.imageUrl,
+                sort_order: state.rules.length - 1
+            }).select().single();
+            if (data) {
+                state = {
+                    ...state,
+                    rules: state.rules.map((r)=>r.id === tempId ? {
+                            ...r,
+                            id: data.id
+                        } : r)
+                };
+                emit();
+            }
+        }
     }, []);
-    const deleteRule = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])((id)=>{
+    const deleteRule = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])(async (id)=>{
         state = {
             ...state,
             rules: state.rules.filter((r)=>r.id !== id)
         };
         emit();
+        const userId = state.auth.currentUserId;
+        if (userId) {
+            await supabase.from("rules").delete().eq("id", id).eq("user_id", userId);
+        }
     }, []);
-    const moveRule = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])((id, direction)=>{
+    const moveRule = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])(async (id, direction)=>{
         const idx = state.rules.findIndex((r)=>r.id === id);
         if (idx < 0) return;
         const newIdx = direction === "up" ? idx - 1 : idx + 1;
@@ -304,8 +590,19 @@ function useStore() {
             rules: items
         };
         emit();
+        const userId = state.auth.currentUserId;
+        if (userId) {
+            await Promise.all([
+                supabase.from("rules").update({
+                    sort_order: newIdx
+                }).eq("id", items[newIdx].id),
+                supabase.from("rules").update({
+                    sort_order: idx
+                }).eq("id", items[idx].id)
+            ]);
+        }
     }, []);
-    const toggleSkipDay = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])((date)=>{
+    const toggleSkipDay = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])(async (date)=>{
         const isSkipped = state.skipDays.includes(date);
         state = {
             ...state,
@@ -315,101 +612,74 @@ function useStore() {
             ]
         };
         emit();
+        const userId = state.auth.currentUserId;
+        if (!userId) return;
+        if (isSkipped) {
+            await supabase.from("daily_notes").delete().eq("user_id", userId).eq("note_date", date).eq("is_skipped", true);
+        } else {
+            await supabase.from("daily_notes").upsert({
+                user_id: userId,
+                note_date: date,
+                is_skipped: true,
+                status: "break"
+            }, {
+                onConflict: "user_id,note_date"
+            });
+        }
     }, []);
-    const setAccentColor = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])((color)=>{
+    const setAccentColor = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])(async (color)=>{
         state = {
             ...state,
             accentColor: color
         };
         emit();
+        const userId = state.auth.currentUserId;
+        if (userId) {
+            await supabase.from("profile_settings").upsert({
+                user_id: userId,
+                accent_color: color,
+                updated_at: new Date().toISOString()
+            });
+        }
     }, []);
-    const setFinnhubApiKey = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])((key)=>{
+    const setFinnhubApiKey = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])(async (key)=>{
         state = {
             ...state,
             finnhubApiKey: key
         };
         emit();
+        const userId = state.auth.currentUserId;
+        if (userId) {
+            await supabase.from("profile_settings").upsert({
+                user_id: userId,
+                finnhub_api_key: key,
+                updated_at: new Date().toISOString()
+            });
+        }
     }, []);
-    const setMetalPriceApiKey = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])((key)=>{
+    const setMetalPriceApiKey = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])(async (key)=>{
         state = {
             ...state,
             metalPriceApiKey: key
         };
         emit();
+        const userId = state.auth.currentUserId;
+        if (userId) {
+            await supabase.from("profile_settings").upsert({
+                user_id: userId,
+                metal_price_api_key: key,
+                updated_at: new Date().toISOString()
+            });
+        }
     }, []);
-    const registerUser = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])((user)=>{
-        const exists = state.auth.users.some((u)=>u.name.toLowerCase() === user.name.toLowerCase());
-        if (exists) return {
-            success: false,
-            error: "Username already taken"
-        };
-        state = {
-            ...state,
-            auth: {
-                ...state.auth,
-                users: [
-                    ...state.auth.users,
-                    user
-                ],
-                isLoggedIn: true,
-                currentUser: user.name
-            },
-            profile: {
-                nickname: user.name,
-                avatarIndex: user.avatarIndex,
-                accountSize: user.accountSize,
-                bio: ""
-            },
-            balance: user.accountSize,
-            initialBalance: user.accountSize
-        };
-        emit();
-        return {
-            success: true
-        };
-    }, []);
-    const loginUser = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])((name, password)=>{
-        const found = state.auth.users.find((u)=>u.name.toLowerCase() === name.toLowerCase() && u.password === password);
-        if (!found) return {
-            success: false,
-            error: "Invalid name or password"
-        };
+    const setSession = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])(async (user)=>{
         state = {
             ...state,
             auth: {
                 ...state.auth,
                 isLoggedIn: true,
-                currentUser: found.name
-            },
-            profile: {
-                ...state.profile,
-                nickname: found.name,
-                avatarIndex: found.avatarIndex
-            }
-        };
-        emit();
-        return {
-            success: true
-        };
-    }, []);
-    const logoutUser = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])(()=>{
-        state = {
-            ...state,
-            auth: {
-                ...state.auth,
-                isLoggedIn: false,
-                currentUser: null
-            }
-        };
-        emit();
-    }, []);
-    const setSession = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])((user)=>{
-        state = {
-            ...state,
-            auth: {
-                ...state.auth,
-                isLoggedIn: true,
-                currentUser: user.name
+                currentUser: user.name,
+                currentUserId: user.id ?? null
             },
             profile: {
                 ...state.profile,
@@ -418,6 +688,37 @@ function useStore() {
             }
         };
         emit();
+        if (user.id) {
+            await loadUserDataFromSupabase(user.id);
+        }
+    }, []);
+    const registerUser = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])((_user)=>{
+        // Registration is handled by /api/auth endpoint + Supabase
+        return {
+            success: true
+        };
+    }, []);
+    const loginUser = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])((_name, _password)=>{
+        // Login is handled by /api/auth endpoint + Supabase
+        return {
+            success: true
+        };
+    }, []);
+    const logoutUser = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])(()=>{
+        state = {
+            ...defaultState,
+            auth: {
+                isLoggedIn: false,
+                currentUser: null,
+                currentUserId: null,
+                users: []
+            }
+        };
+        isInitialized = false;
+        emit();
+        fetch("/api/auth", {
+            method: "DELETE"
+        }).catch(()=>{});
     }, []);
     return {
         ...snap,

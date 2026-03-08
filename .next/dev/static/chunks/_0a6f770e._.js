@@ -11,17 +11,29 @@ __turbopack_context__.s([
     ()=>generateId,
     "getWeekStart",
     ()=>getWeekStart,
+    "loadUserDataFromSupabase",
+    ()=>loadUserDataFromSupabase,
+    "supabase",
+    ()=>supabase,
     "useStore",
     ()=>useStore
 ]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$build$2f$polyfills$2f$process$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = /*#__PURE__*/ __turbopack_context__.i("[project]/node_modules/next/dist/build/polyfills/process.js [app-client] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/compiled/react/index.js [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$supabase$2f$supabase$2d$js$2f$dist$2f$index$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$locals$3e$__ = __turbopack_context__.i("[project]/node_modules/@supabase/supabase-js/dist/index.mjs [app-client] (ecmascript) <locals>");
 var _s = __turbopack_context__.k.signature();
 "use client";
 ;
+;
+// ── Supabase Client ────────────────────────────────────────────────
+const supabaseUrl = ("TURBOPACK compile-time value", "https://cbnuokgmzvlmrtjiwigh.supabase.co");
+const supabaseAnonKey = ("TURBOPACK compile-time value", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNibnVva2dtenZsbXJ0aml3aWdoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI1OTgyNjgsImV4cCI6MjA4ODE3NDI2OH0.cqyVdT7fA1isnX2QIk27ZGZSIm96L3rMMuYl9amz4CE");
+const supabase = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$supabase$2f$supabase$2d$js$2f$dist$2f$index$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$locals$3e$__["createClient"])(supabaseUrl, supabaseAnonKey);
 const defaultState = {
     auth: {
         isLoggedIn: false,
         currentUser: null,
+        currentUserId: null,
         users: []
     },
     profile: {
@@ -72,47 +84,17 @@ const defaultState = {
     skipDays: [],
     accentColor: "blue",
     finnhubApiKey: "",
-    metalPriceApiKey: "d849bb0071fd2f5442fdd4b1f0381498"
+    metalPriceApiKey: "d849bb0071fd2f5442fdd4b1f0381498",
+    isSyncing: false
 };
 // ── Store ──────────────────────────────────────────────────────────
 let state = defaultState;
 let listeners = new Set();
 let isInitialized = false;
-function loadFromStorage() {
-    if ("TURBOPACK compile-time falsy", 0) //TURBOPACK unreachable
-    ;
-    try {
-        const stored = localStorage.getItem("trading-journal-data");
-        if (stored) {
-            const parsed = JSON.parse(stored);
-            return {
-                ...defaultState,
-                ...parsed
-            };
-        }
-    } catch  {
-    // ignore
-    }
-    return defaultState;
-}
-function saveToStorage() {
-    if ("TURBOPACK compile-time falsy", 0) //TURBOPACK unreachable
-    ;
-    try {
-        localStorage.setItem("trading-journal-data", JSON.stringify(state));
-    } catch  {
-    // ignore
-    }
-}
 function emit() {
-    saveToStorage();
     listeners.forEach((l)=>l());
 }
 function getSnapshot() {
-    if (!isInitialized && ("TURBOPACK compile-time value", "object") !== "undefined") {
-        state = loadFromStorage();
-        isInitialized = true;
-    }
     return state;
 }
 function getServerSnapshot() {
@@ -120,17 +102,157 @@ function getServerSnapshot() {
 }
 function subscribe(listener) {
     listeners.add(listener);
-    if (!isInitialized && ("TURBOPACK compile-time value", "object") !== "undefined") {
-        state = loadFromStorage();
-        isInitialized = true;
-    }
     return ()=>listeners.delete(listener);
+}
+async function loadUserDataFromSupabase(userId) {
+    state = {
+        ...state,
+        isSyncing: true
+    };
+    emit();
+    try {
+        // Load profile
+        const { data: profile } = await supabase.from("profile_settings").select("*").eq("user_id", userId).single();
+        // Load trades
+        const { data: trades } = await supabase.from("trades").select("*").eq("user_id", userId).order("trade_date", {
+            ascending: false
+        });
+        // Load weekly notes
+        const { data: weeklyNotes } = await supabase.from("weekly_notes").select("*").eq("user_id", userId);
+        // Load mistakes
+        const { data: mistakes } = await supabase.from("mistakes").select("*").eq("user_id", userId);
+        // Load important points
+        const { data: importantPoints } = await supabase.from("important_points").select("*").eq("user_id", userId).order("sort_order", {
+            ascending: true
+        });
+        // Load rules
+        const { data: rules } = await supabase.from("rules").select("*").eq("user_id", userId).order("sort_order", {
+            ascending: true
+        });
+        // Load skip days
+        const { data: dailyNotes } = await supabase.from("daily_notes").select("*").eq("user_id", userId).eq("is_skipped", true);
+        state = {
+            ...state,
+            isSyncing: false,
+            profile: profile ? {
+                nickname: profile.nickname ?? state.profile.nickname,
+                avatarIndex: profile.avatar_index ?? 0,
+                customAvatarUrl: profile.custom_avatar_url,
+                accountSize: Number(profile.account_size) || 10000,
+                bio: profile.bio ?? ""
+            } : state.profile,
+            balance: profile ? Number(profile.account_size) || state.balance : state.balance,
+            initialBalance: profile ? Number(profile.account_size) || state.initialBalance : state.initialBalance,
+            accentColor: profile?.accent_color ?? state.accentColor,
+            finnhubApiKey: profile?.finnhub_api_key ?? "",
+            metalPriceApiKey: profile?.metal_price_api_key ?? state.metalPriceApiKey,
+            trades: (trades ?? []).map((t)=>({
+                    id: t.id,
+                    date: t.trade_date,
+                    asset: t.asset,
+                    result: Number(t.result),
+                    notes: t.notes ?? "",
+                    photoUrl: t.photo_url
+                })),
+            weeklyNotes: (weeklyNotes ?? []).map((w)=>({
+                    id: w.id,
+                    weekStart: w.week_start_date,
+                    notes: w.thoughts ?? "",
+                    learning: w.learning,
+                    improve: w.improve,
+                    thoughts: w.thoughts,
+                    balanceChange: Number(w.balance_change) || 0,
+                    goalHit: w.goal_hit ?? false
+                })),
+            mistakes: (mistakes ?? []).map((m)=>({
+                    id: m.id,
+                    date: m.mistake_date,
+                    description: m.description,
+                    tag: m.tag
+                })),
+            importantPoints: (importantPoints ?? []).map((p)=>({
+                    id: p.id,
+                    note: p.note,
+                    pinned: p.is_pinned ?? false,
+                    imageUrl: p.image_url,
+                    createdAt: p.created_at
+                })),
+            rules: rules && rules.length > 0 ? rules.map((r)=>({
+                    id: r.id,
+                    text: r.text,
+                    imageUrl: r.image_url,
+                    createdAt: r.created_at
+                })) : state.rules,
+            skipDays: (dailyNotes ?? []).map((d)=>d.note_date)
+        };
+        // Recalculate balance from trades
+        if (trades && trades.length > 0 && profile) {
+            const baseBalance = Number(profile.account_size) || 10000;
+            let currentBalance = baseBalance;
+            const sortedTrades = [
+                ...trades
+            ].sort((a, b)=>new Date(a.trade_date).getTime() - new Date(b.trade_date).getTime());
+            for (const t of sortedTrades){
+                currentBalance = currentBalance + currentBalance * (Number(t.result) / 100);
+            }
+            state = {
+                ...state,
+                balance: currentBalance,
+                initialBalance: baseBalance
+            };
+        }
+        emit();
+    } catch (error) {
+        console.error("Failed to load data from Supabase:", error);
+        state = {
+            ...state,
+            isSyncing: false
+        };
+        emit();
+    }
 }
 function useStore() {
     _s();
     const snap = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useSyncExternalStore"])(subscribe, getSnapshot, getServerSnapshot);
+    // Initialize: check session on mount
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
+        "useStore.useEffect": ()=>{
+            if (isInitialized) return;
+            isInitialized = true;
+            const checkSession = {
+                "useStore.useEffect.checkSession": async ()=>{
+                    const res = await fetch("/api/auth/session").catch({
+                        "useStore.useEffect.checkSession": ()=>null
+                    }["useStore.useEffect.checkSession"]);
+                    if (!res?.ok) return;
+                    const data = await res.json().catch({
+                        "useStore.useEffect.checkSession": ()=>null
+                    }["useStore.useEffect.checkSession"]);
+                    if (data?.user) {
+                        state = {
+                            ...state,
+                            auth: {
+                                ...state.auth,
+                                isLoggedIn: true,
+                                currentUser: data.user.name,
+                                currentUserId: data.user.id
+                            },
+                            profile: {
+                                ...state.profile,
+                                nickname: data.user.nickname,
+                                avatarIndex: data.user.avatarIndex
+                            }
+                        };
+                        emit();
+                        await loadUserDataFromSupabase(data.user.id);
+                    }
+                }
+            }["useStore.useEffect.checkSession"];
+            checkSession();
+        }
+    }["useStore.useEffect"], []);
     const updateProfile = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
-        "useStore.useCallback[updateProfile]": (profile)=>{
+        "useStore.useCallback[updateProfile]": async (profile)=>{
             state = {
                 ...state,
                 profile: {
@@ -139,10 +261,22 @@ function useStore() {
                 }
             };
             emit();
+            const userId = state.auth.currentUserId;
+            if (!userId) return;
+            await supabase.from("profile_settings").upsert({
+                user_id: userId,
+                nickname: state.profile.nickname,
+                avatar_index: state.profile.avatarIndex,
+                custom_avatar_url: profile.customAvatarUrl,
+                account_size: state.profile.accountSize,
+                bio: state.profile.bio,
+                accent_color: state.accentColor,
+                updated_at: new Date().toISOString()
+            });
         }
     }["useStore.useCallback[updateProfile]"], []);
     const setBalance = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
-        "useStore.useCallback[setBalance]": (balance)=>{
+        "useStore.useCallback[setBalance]": async (balance)=>{
             state = {
                 ...state,
                 balance
@@ -151,19 +285,27 @@ function useStore() {
         }
     }["useStore.useCallback[setBalance]"], []);
     const setInitialBalance = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
-        "useStore.useCallback[setInitialBalance]": (initialBalance)=>{
+        "useStore.useCallback[setInitialBalance]": async (initialBalance)=>{
             state = {
                 ...state,
                 initialBalance
             };
             emit();
+            const userId = state.auth.currentUserId;
+            if (!userId) return;
+            await supabase.from("profile_settings").upsert({
+                user_id: userId,
+                account_size: initialBalance,
+                updated_at: new Date().toISOString()
+            });
         }
     }["useStore.useCallback[setInitialBalance]"], []);
     const addTrade = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
-        "useStore.useCallback[addTrade]": (trade)=>{
+        "useStore.useCallback[addTrade]": async (trade)=>{
+            const tempId = crypto.randomUUID();
             const newTrade = {
                 ...trade,
-                id: crypto.randomUUID()
+                id: tempId
             };
             state = {
                 ...state,
@@ -172,14 +314,35 @@ function useStore() {
                     newTrade
                 ]
             };
-            // Auto-update balance
             const change = state.balance * (trade.result / 100);
             state = {
                 ...state,
                 balance: state.balance + change
             };
             emit();
-            // Notify Telegram (Only if Anush)
+            const userId = state.auth.currentUserId;
+            if (userId) {
+                const { data } = await supabase.from("trades").insert({
+                    user_id: userId,
+                    asset: trade.asset,
+                    result: trade.result,
+                    trade_date: trade.date,
+                    notes: trade.notes,
+                    photo_url: trade.photoUrl
+                }).select().single();
+                if (data) {
+                    state = {
+                        ...state,
+                        trades: state.trades.map({
+                            "useStore.useCallback[addTrade]": (t)=>t.id === tempId ? {
+                                    ...t,
+                                    id: data.id
+                                } : t
+                        }["useStore.useCallback[addTrade]"])
+                    };
+                    emit();
+                }
+            }
             if (state.auth.currentUser === "Anush") {
                 fetch("/api/journal/status", {
                     method: "POST",
@@ -199,7 +362,7 @@ function useStore() {
         }
     }["useStore.useCallback[addTrade]"], []);
     const updateTrade = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
-        "useStore.useCallback[updateTrade]": (id, updates)=>{
+        "useStore.useCallback[updateTrade]": async (id, updates)=>{
             state = {
                 ...state,
                 trades: state.trades.map({
@@ -210,10 +373,20 @@ function useStore() {
                 }["useStore.useCallback[updateTrade]"])
             };
             emit();
+            const userId = state.auth.currentUserId;
+            if (!userId) return;
+            await supabase.from("trades").update({
+                asset: updates.asset,
+                result: updates.result,
+                trade_date: updates.date,
+                notes: updates.notes,
+                photo_url: updates.photoUrl,
+                updated_at: new Date().toISOString()
+            }).eq("id", id).eq("user_id", userId);
         }
     }["useStore.useCallback[updateTrade]"], []);
     const deleteTrade = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
-        "useStore.useCallback[deleteTrade]": (id)=>{
+        "useStore.useCallback[deleteTrade]": async (id)=>{
             state = {
                 ...state,
                 trades: state.trades.filter({
@@ -221,10 +394,14 @@ function useStore() {
                 }["useStore.useCallback[deleteTrade]"])
             };
             emit();
+            const userId = state.auth.currentUserId;
+            if (userId) {
+                await supabase.from("trades").delete().eq("id", id).eq("user_id", userId);
+            }
         }
     }["useStore.useCallback[deleteTrade]"], []);
     const addWeeklyNote = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
-        "useStore.useCallback[addWeeklyNote]": (note)=>{
+        "useStore.useCallback[addWeeklyNote]": async (note)=>{
             const existing = state.weeklyNotes.find({
                 "useStore.useCallback[addWeeklyNote].existing": (n)=>n.weekStart === note.weekStart
             }["useStore.useCallback[addWeeklyNote].existing"]);
@@ -251,25 +428,61 @@ function useStore() {
                 };
             }
             emit();
+            const userId = state.auth.currentUserId;
+            if (!userId) return;
+            await supabase.from("weekly_notes").upsert({
+                user_id: userId,
+                week_start_date: note.weekStart,
+                learning: note.learning,
+                improve: note.improve,
+                thoughts: note.thoughts,
+                balance_change: note.balanceChange,
+                goal_hit: note.goalHit,
+                updated_at: new Date().toISOString()
+            }, {
+                onConflict: "user_id,week_start_date"
+            });
         }
     }["useStore.useCallback[addWeeklyNote]"], []);
     const addMistake = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
-        "useStore.useCallback[addMistake]": (mistake)=>{
+        "useStore.useCallback[addMistake]": async (mistake)=>{
+            const tempId = crypto.randomUUID();
             state = {
                 ...state,
                 mistakes: [
                     ...state.mistakes,
                     {
                         ...mistake,
-                        id: crypto.randomUUID()
+                        id: tempId
                     }
                 ]
             };
             emit();
+            const userId = state.auth.currentUserId;
+            if (userId) {
+                const { data } = await supabase.from("mistakes").insert({
+                    user_id: userId,
+                    mistake_date: mistake.date,
+                    description: mistake.description,
+                    tag: mistake.tag
+                }).select().single();
+                if (data) {
+                    state = {
+                        ...state,
+                        mistakes: state.mistakes.map({
+                            "useStore.useCallback[addMistake]": (m)=>m.id === tempId ? {
+                                    ...m,
+                                    id: data.id
+                                } : m
+                        }["useStore.useCallback[addMistake]"])
+                    };
+                    emit();
+                }
+            }
         }
     }["useStore.useCallback[addMistake]"], []);
     const deleteMistake = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
-        "useStore.useCallback[deleteMistake]": (id)=>{
+        "useStore.useCallback[deleteMistake]": async (id)=>{
             state = {
                 ...state,
                 mistakes: state.mistakes.filter({
@@ -277,26 +490,54 @@ function useStore() {
                 }["useStore.useCallback[deleteMistake]"])
             };
             emit();
+            const userId = state.auth.currentUserId;
+            if (userId) {
+                await supabase.from("mistakes").delete().eq("id", id).eq("user_id", userId);
+            }
         }
     }["useStore.useCallback[deleteMistake]"], []);
     const addImportantPoint = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
-        "useStore.useCallback[addImportantPoint]": (point)=>{
+        "useStore.useCallback[addImportantPoint]": async (point)=>{
+            const tempId = crypto.randomUUID();
+            const createdAt = new Date().toISOString();
             state = {
                 ...state,
                 importantPoints: [
                     ...state.importantPoints,
                     {
                         ...point,
-                        id: crypto.randomUUID(),
-                        createdAt: new Date().toISOString()
+                        id: tempId,
+                        createdAt
                     }
                 ]
             };
             emit();
+            const userId = state.auth.currentUserId;
+            if (userId) {
+                const { data } = await supabase.from("important_points").insert({
+                    user_id: userId,
+                    note: point.note,
+                    is_pinned: point.pinned,
+                    image_url: point.imageUrl,
+                    sort_order: state.importantPoints.length - 1
+                }).select().single();
+                if (data) {
+                    state = {
+                        ...state,
+                        importantPoints: state.importantPoints.map({
+                            "useStore.useCallback[addImportantPoint]": (p)=>p.id === tempId ? {
+                                    ...p,
+                                    id: data.id
+                                } : p
+                        }["useStore.useCallback[addImportantPoint]"])
+                    };
+                    emit();
+                }
+            }
         }
     }["useStore.useCallback[addImportantPoint]"], []);
     const deleteImportantPoint = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
-        "useStore.useCallback[deleteImportantPoint]": (id)=>{
+        "useStore.useCallback[deleteImportantPoint]": async (id)=>{
             state = {
                 ...state,
                 importantPoints: state.importantPoints.filter({
@@ -304,10 +545,14 @@ function useStore() {
                 }["useStore.useCallback[deleteImportantPoint]"])
             };
             emit();
+            const userId = state.auth.currentUserId;
+            if (userId) {
+                await supabase.from("important_points").delete().eq("id", id).eq("user_id", userId);
+            }
         }
     }["useStore.useCallback[deleteImportantPoint]"], []);
     const moveImportantPoint = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
-        "useStore.useCallback[moveImportantPoint]": (id, direction)=>{
+        "useStore.useCallback[moveImportantPoint]": async (id, direction)=>{
             const idx = state.importantPoints.findIndex({
                 "useStore.useCallback[moveImportantPoint].idx": (p)=>p.id === id
             }["useStore.useCallback[moveImportantPoint].idx"]);
@@ -326,26 +571,60 @@ function useStore() {
                 importantPoints: items
             };
             emit();
+            const userId = state.auth.currentUserId;
+            if (userId) {
+                await Promise.all([
+                    supabase.from("important_points").update({
+                        sort_order: newIdx
+                    }).eq("id", items[newIdx].id),
+                    supabase.from("important_points").update({
+                        sort_order: idx
+                    }).eq("id", items[idx].id)
+                ]);
+            }
         }
     }["useStore.useCallback[moveImportantPoint]"], []);
     const addRule = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
-        "useStore.useCallback[addRule]": (rule)=>{
+        "useStore.useCallback[addRule]": async (rule)=>{
+            const tempId = crypto.randomUUID();
+            const createdAt = new Date().toISOString();
             state = {
                 ...state,
                 rules: [
                     ...state.rules,
                     {
                         ...rule,
-                        id: crypto.randomUUID(),
-                        createdAt: new Date().toISOString()
+                        id: tempId,
+                        createdAt
                     }
                 ]
             };
             emit();
+            const userId = state.auth.currentUserId;
+            if (userId) {
+                const { data } = await supabase.from("rules").insert({
+                    user_id: userId,
+                    text: rule.text,
+                    image_url: rule.imageUrl,
+                    sort_order: state.rules.length - 1
+                }).select().single();
+                if (data) {
+                    state = {
+                        ...state,
+                        rules: state.rules.map({
+                            "useStore.useCallback[addRule]": (r)=>r.id === tempId ? {
+                                    ...r,
+                                    id: data.id
+                                } : r
+                        }["useStore.useCallback[addRule]"])
+                    };
+                    emit();
+                }
+            }
         }
     }["useStore.useCallback[addRule]"], []);
     const deleteRule = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
-        "useStore.useCallback[deleteRule]": (id)=>{
+        "useStore.useCallback[deleteRule]": async (id)=>{
             state = {
                 ...state,
                 rules: state.rules.filter({
@@ -353,10 +632,14 @@ function useStore() {
                 }["useStore.useCallback[deleteRule]"])
             };
             emit();
+            const userId = state.auth.currentUserId;
+            if (userId) {
+                await supabase.from("rules").delete().eq("id", id).eq("user_id", userId);
+            }
         }
     }["useStore.useCallback[deleteRule]"], []);
     const moveRule = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
-        "useStore.useCallback[moveRule]": (id, direction)=>{
+        "useStore.useCallback[moveRule]": async (id, direction)=>{
             const idx = state.rules.findIndex({
                 "useStore.useCallback[moveRule].idx": (r)=>r.id === id
             }["useStore.useCallback[moveRule].idx"]);
@@ -375,10 +658,21 @@ function useStore() {
                 rules: items
             };
             emit();
+            const userId = state.auth.currentUserId;
+            if (userId) {
+                await Promise.all([
+                    supabase.from("rules").update({
+                        sort_order: newIdx
+                    }).eq("id", items[newIdx].id),
+                    supabase.from("rules").update({
+                        sort_order: idx
+                    }).eq("id", items[idx].id)
+                ]);
+            }
         }
     }["useStore.useCallback[moveRule]"], []);
     const toggleSkipDay = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
-        "useStore.useCallback[toggleSkipDay]": (date)=>{
+        "useStore.useCallback[toggleSkipDay]": async (date)=>{
             const isSkipped = state.skipDays.includes(date);
             state = {
                 ...state,
@@ -390,119 +684,82 @@ function useStore() {
                 ]
             };
             emit();
+            const userId = state.auth.currentUserId;
+            if (!userId) return;
+            if (isSkipped) {
+                await supabase.from("daily_notes").delete().eq("user_id", userId).eq("note_date", date).eq("is_skipped", true);
+            } else {
+                await supabase.from("daily_notes").upsert({
+                    user_id: userId,
+                    note_date: date,
+                    is_skipped: true,
+                    status: "break"
+                }, {
+                    onConflict: "user_id,note_date"
+                });
+            }
         }
     }["useStore.useCallback[toggleSkipDay]"], []);
     const setAccentColor = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
-        "useStore.useCallback[setAccentColor]": (color)=>{
+        "useStore.useCallback[setAccentColor]": async (color)=>{
             state = {
                 ...state,
                 accentColor: color
             };
             emit();
+            const userId = state.auth.currentUserId;
+            if (userId) {
+                await supabase.from("profile_settings").upsert({
+                    user_id: userId,
+                    accent_color: color,
+                    updated_at: new Date().toISOString()
+                });
+            }
         }
     }["useStore.useCallback[setAccentColor]"], []);
     const setFinnhubApiKey = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
-        "useStore.useCallback[setFinnhubApiKey]": (key)=>{
+        "useStore.useCallback[setFinnhubApiKey]": async (key)=>{
             state = {
                 ...state,
                 finnhubApiKey: key
             };
             emit();
+            const userId = state.auth.currentUserId;
+            if (userId) {
+                await supabase.from("profile_settings").upsert({
+                    user_id: userId,
+                    finnhub_api_key: key,
+                    updated_at: new Date().toISOString()
+                });
+            }
         }
     }["useStore.useCallback[setFinnhubApiKey]"], []);
     const setMetalPriceApiKey = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
-        "useStore.useCallback[setMetalPriceApiKey]": (key)=>{
+        "useStore.useCallback[setMetalPriceApiKey]": async (key)=>{
             state = {
                 ...state,
                 metalPriceApiKey: key
             };
             emit();
+            const userId = state.auth.currentUserId;
+            if (userId) {
+                await supabase.from("profile_settings").upsert({
+                    user_id: userId,
+                    metal_price_api_key: key,
+                    updated_at: new Date().toISOString()
+                });
+            }
         }
     }["useStore.useCallback[setMetalPriceApiKey]"], []);
-    const registerUser = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
-        "useStore.useCallback[registerUser]": (user)=>{
-            const exists = state.auth.users.some({
-                "useStore.useCallback[registerUser].exists": (u)=>u.name.toLowerCase() === user.name.toLowerCase()
-            }["useStore.useCallback[registerUser].exists"]);
-            if (exists) return {
-                success: false,
-                error: "Username already taken"
-            };
-            state = {
-                ...state,
-                auth: {
-                    ...state.auth,
-                    users: [
-                        ...state.auth.users,
-                        user
-                    ],
-                    isLoggedIn: true,
-                    currentUser: user.name
-                },
-                profile: {
-                    nickname: user.name,
-                    avatarIndex: user.avatarIndex,
-                    accountSize: user.accountSize,
-                    bio: ""
-                },
-                balance: user.accountSize,
-                initialBalance: user.accountSize
-            };
-            emit();
-            return {
-                success: true
-            };
-        }
-    }["useStore.useCallback[registerUser]"], []);
-    const loginUser = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
-        "useStore.useCallback[loginUser]": (name, password)=>{
-            const found = state.auth.users.find({
-                "useStore.useCallback[loginUser].found": (u)=>u.name.toLowerCase() === name.toLowerCase() && u.password === password
-            }["useStore.useCallback[loginUser].found"]);
-            if (!found) return {
-                success: false,
-                error: "Invalid name or password"
-            };
-            state = {
-                ...state,
-                auth: {
-                    ...state.auth,
-                    isLoggedIn: true,
-                    currentUser: found.name
-                },
-                profile: {
-                    ...state.profile,
-                    nickname: found.name,
-                    avatarIndex: found.avatarIndex
-                }
-            };
-            emit();
-            return {
-                success: true
-            };
-        }
-    }["useStore.useCallback[loginUser]"], []);
-    const logoutUser = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
-        "useStore.useCallback[logoutUser]": ()=>{
-            state = {
-                ...state,
-                auth: {
-                    ...state.auth,
-                    isLoggedIn: false,
-                    currentUser: null
-                }
-            };
-            emit();
-        }
-    }["useStore.useCallback[logoutUser]"], []);
     const setSession = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
-        "useStore.useCallback[setSession]": (user)=>{
+        "useStore.useCallback[setSession]": async (user)=>{
             state = {
                 ...state,
                 auth: {
                     ...state.auth,
                     isLoggedIn: true,
-                    currentUser: user.name
+                    currentUser: user.name,
+                    currentUserId: user.id ?? null
                 },
                 profile: {
                     ...state.profile,
@@ -511,8 +768,47 @@ function useStore() {
                 }
             };
             emit();
+            if (user.id) {
+                await loadUserDataFromSupabase(user.id);
+            }
         }
     }["useStore.useCallback[setSession]"], []);
+    const registerUser = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
+        "useStore.useCallback[registerUser]": (_user)=>{
+            // Registration is handled by /api/auth endpoint + Supabase
+            return {
+                success: true
+            };
+        }
+    }["useStore.useCallback[registerUser]"], []);
+    const loginUser = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
+        "useStore.useCallback[loginUser]": (_name, _password)=>{
+            // Login is handled by /api/auth endpoint + Supabase
+            return {
+                success: true
+            };
+        }
+    }["useStore.useCallback[loginUser]"], []);
+    const logoutUser = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
+        "useStore.useCallback[logoutUser]": ()=>{
+            state = {
+                ...defaultState,
+                auth: {
+                    isLoggedIn: false,
+                    currentUser: null,
+                    currentUserId: null,
+                    users: []
+                }
+            };
+            isInitialized = false;
+            emit();
+            fetch("/api/auth", {
+                method: "DELETE"
+            }).catch({
+                "useStore.useCallback[logoutUser]": ()=>{}
+            }["useStore.useCallback[logoutUser]"]);
+        }
+    }["useStore.useCallback[logoutUser]"], []);
     return {
         ...snap,
         updateProfile,
@@ -540,7 +836,7 @@ function useStore() {
         logoutUser
     };
 }
-_s(useStore, "vCEvihLUFtjRsWe7IyyqCH26Hjw=", false, function() {
+_s(useStore, "qA4kmmiJgaoA1UnlYcPRAqySp5A=", false, function() {
     return [
         __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useSyncExternalStore"]
     ];

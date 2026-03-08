@@ -14,7 +14,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Layers,
-  Newspaper,
 } from "lucide-react"
 
 export type Section =
@@ -25,7 +24,6 @@ export type Section =
   | "mistakes"
   | "rules"
   | "analytics"
-  | "news"
   | "export"
 
 interface NavItem {
@@ -42,7 +40,6 @@ const navItems: NavItem[] = [
   { id: "mistakes", label: "Mistakes", icon: AlertTriangle },
   { id: "rules", label: "Rules", icon: Shield },
   { id: "analytics", label: "Analytics", icon: TrendingUp },
-  { id: "news", label: "News", icon: Newspaper },
   { id: "export", label: "Export", icon: FileDown },
 ]
 

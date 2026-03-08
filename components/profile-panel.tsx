@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { useStore, formatCurrency } from "@/lib/store"
 import { cn } from "@/lib/utils"
-import { X, Check, Sun, Moon, Palette, LogOut, Key } from "lucide-react"
+import { X, Check, Sun, Moon, Palette, LogOut } from "lucide-react"
 import { useTheme } from "next-themes"
 
 const AVATARS = [
@@ -38,8 +38,6 @@ export function ProfilePanel({ open, onClose }: ProfilePanelProps) {
   const [bio, setBio] = useState(store.profile.bio)
   const [accountSize, setAccountSize] = useState(store.profile.accountSize.toString())
   const [selectedAvatar, setSelectedAvatar] = useState(store.profile.avatarIndex)
-  const [finnhubKey, setFinnhubKey] = useState(store.finnhubApiKey)
-  const [metalPriceKey, setMetalPriceKey] = useState(store.metalPriceApiKey)
 
   const winRate = store.trades.length > 0
     ? ((store.trades.filter((t) => t.result > 0).length / store.trades.length) * 100).toFixed(1)
@@ -56,8 +54,6 @@ export function ProfilePanel({ open, onClose }: ProfilePanelProps) {
       accountSize: parseFloat(accountSize) || 0,
       avatarIndex: selectedAvatar,
     })
-    store.setFinnhubApiKey(finnhubKey)
-    store.setMetalPriceApiKey(metalPriceKey)
     onClose()
   }
 
@@ -235,50 +231,6 @@ export function ProfilePanel({ open, onClose }: ProfilePanelProps) {
                 ))}
               </div>
             </div>
-          </div>
-
-          {/* MetalPrice API Key */}
-          <div className="mt-4">
-            <label className="text-xs font-medium text-muted-foreground mb-1.5 flex items-center gap-1.5">
-              <Key className="w-3.5 h-3.5" />
-              MetalPrice API Key
-            </label>
-            <input
-              value={metalPriceKey}
-              onChange={(e) => setMetalPriceKey(e.target.value)}
-              type="password"
-              className="w-full bg-input/50 border border-border rounded-xl px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all duration-200"
-              placeholder="Your MetalPrice API key"
-            />
-            <p className="text-[11px] text-muted-foreground mt-1">
-              Key from{" "}
-              <a href="https://metalpriceapi.com" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                metalpriceapi.com
-              </a>
-              {" "}for gold price
-            </p>
-          </div>
-
-          {/* Finnhub API Key */}
-          <div className="mt-4">
-            <label className="text-xs font-medium text-muted-foreground mb-1.5 flex items-center gap-1.5">
-              <Key className="w-3.5 h-3.5" />
-              Finnhub API Key
-            </label>
-            <input
-              value={finnhubKey}
-              onChange={(e) => setFinnhubKey(e.target.value)}
-              type="password"
-              className="w-full bg-input/50 border border-border rounded-xl px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all duration-200"
-              placeholder="Your Finnhub API key"
-            />
-            <p className="text-[11px] text-muted-foreground mt-1">
-              Free key from{" "}
-              <a href="https://finnhub.io" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                finnhub.io
-              </a>
-              {" "}for gold news
-            </p>
           </div>
 
           {/* Save */}

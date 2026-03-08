@@ -12,7 +12,6 @@ import { MistakesSection } from "@/components/sections/mistakes-section"
 import { RulesSection } from "@/components/sections/rules-section"
 import { AnalyticsSection } from "@/components/sections/analytics-section"
 import { ExportSection } from "@/components/sections/export-section"
-import { NewsSection } from "@/components/sections/news-section"
 import { AuthScreen } from "@/components/auth-screen"
 import { useStore, formatCurrency } from "@/lib/store"
 import { cn } from "@/lib/utils"
@@ -26,7 +25,6 @@ const sectionTitles: Record<Section, string> = {
   mistakes: "Mistakes & Notes",
   rules: "Rules",
   analytics: "Analytics",
-  news: "Gold News",
   export: "Export",
 }
 
@@ -52,8 +50,6 @@ export function AppShell() {
         return <RulesSection />
       case "analytics":
         return <AnalyticsSection />
-      case "news":
-        return <NewsSection />
       case "export":
         return <ExportSection />
       default:

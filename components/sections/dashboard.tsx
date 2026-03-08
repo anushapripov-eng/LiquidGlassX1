@@ -17,25 +17,6 @@ import {
 
 export function Dashboard() {
   const store = useStore()
-  const [goldPrice, setGoldPrice] = useState<{ price: number; change: number } | null>(null)
-
-  useEffect(() => {
-    const fetchGold = async () => {
-      const key = store.metalPriceApiKey || "d849bb0071fd2f5442fdd4b1f0381498"
-      try {
-        const res = await fetch(`https://api.metalpriceapi.com/v1/latest?api_key=${key}&base=XAU&currencies=USD`)
-        const data = await res.json()
-        if (data.rates && data.rates.USD) {
-          // MetalPriceAPI returns price of 1 unit of base in currency. 
-          // For XAU/USD it's the price of 1 ounce of gold.
-          setGoldPrice({ price: data.rates.USD, change: 0 }) 
-        }
-      } catch (e) {}
-    }
-    fetchGold()
-    const interval = setInterval(fetchGold, 30000)
-    return () => clearInterval(interval)
-  }, [store.metalPriceApiKey])
 
   const stats = useMemo(() => {
     const trades = store.trades
@@ -44,7 +25,6 @@ export function Dashboard() {
     const losses = trades.filter((t) => t.result < 0)
     const winRate = trades.length > 0 ? (wins.length / trades.length) * 100 : 0
 
-    // Current streak
     let streak = 0
     const sorted = [...trades].sort((a, b) => b.date.localeCompare(a.date))
     if (sorted.length > 0) {
@@ -56,7 +36,6 @@ export function Dashboard() {
       if (!firstResult) streak = -streak
     }
 
-    // Weekly progress
     const now = new Date()
     const currentWeekStart = getWeekStart(now)
     const weekTrades = trades.filter((t) => getWeekStart(new Date(t.date)) === currentWeekStart)
@@ -64,7 +43,6 @@ export function Dashboard() {
     const weeklyGoal = 2
     const weeklyProgress = Math.min((weeklyPL / weeklyGoal) * 100, 100)
 
-    // Growth chart data
     let runningBalance = store.initialBalance
     const chartData = trades
       .sort((a, b) => a.date.localeCompare(b.date))
@@ -76,18 +54,15 @@ export function Dashboard() {
         }
       })
     if (chartData.length > 0) {
-      chartData.unshift({
-        date: "Start",
-        balance: store.initialBalance,
-      })
+      chartData.unshift({ date: "Start", balance: store.initialBalance })
     }
 
-    // Total growth
     const totalGrowth = store.initialBalance > 0
       ? ((store.balance - store.initialBalance) / store.initialBalance) * 100
       : 0
 
     return {
+      lastTrade,
       winRate,
       streak,
       weeklyPL,
@@ -104,32 +79,6 @@ export function Dashboard() {
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Gold Price Header */}
-      <div className="flex items-center justify-between px-1">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-full bg-amber-500/10 flex items-center justify-center">
-            <Coins className="w-4 h-4 text-amber-500" />
-          </div>
-          <div>
-            <div className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">XAU/USD Gold</div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-bold text-foreground">
-                {goldPrice ? `$${goldPrice.price.toLocaleString()}` : "---"}
-              </span>
-              {goldPrice && (
-                <span className={cn(
-                  "text-[10px] font-bold flex items-center",
-                  goldPrice.change >= 0 ? "text-success" : "text-destructive"
-                )}>
-                  {goldPrice.change >= 0 ? <ArrowUpRight className="w-2.5 h-2.5" /> : <ArrowDownRight className="w-2.5 h-2.5" />}
-                  {Math.abs(goldPrice.change).toFixed(2)}%
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Balance Hero */}
       <GlassCard className="p-6 relative overflow-hidden group" variant="strong" hover3d>
         <div className="absolute -top-20 -right-20 w-60 h-60 rounded-full bg-primary/5 blur-3xl group-hover:bg-primary/10 transition-colors duration-500" />
@@ -274,18 +223,8 @@ export function Dashboard() {
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.5 0 0 / 0.1)" />
-                <XAxis
-                  dataKey="date"
-                  tick={{ fontSize: 10, fill: "oklch(0.5 0 0)" }}
-                  tickLine={false}
-                  axisLine={false}
-                />
-                <YAxis
-                  tick={{ fontSize: 10, fill: "oklch(0.5 0 0)" }}
-                  tickLine={false}
-                  axisLine={false}
-                  tickFormatter={(v) => `$${(v / 1000).toFixed(1)}k`}
-                />
+                <XAxis dataKey="date" tick={{ fontSize: 10, fill: "oklch(0.5 0 0)" }} tickLine={false} axisLine={false} />
+                <YAxis tick={{ fontSize: 10, fill: "oklch(0.5 0 0)" }} tickLine={false} axisLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(1)}k`} />
                 <Tooltip
                   contentStyle={{
                     background: "oklch(0.15 0.02 260 / 0.85)",
@@ -297,13 +236,7 @@ export function Dashboard() {
                   }}
                   formatter={(value: number) => [formatCurrency(value), "Balance"]}
                 />
-                <Area
-                  type="monotone"
-                  dataKey="balance"
-                  stroke="oklch(0.55 0.18 250)"
-                  strokeWidth={2}
-                  fill="url(#balanceGradient)"
-                />
+                <Area type="monotone" dataKey="balance" stroke="oklch(0.55 0.18 250)" strokeWidth={2} fill="url(#balanceGradient)" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
